@@ -4,25 +4,42 @@ import CardMedia from "@mui/material/CardMedia";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import { StyledCard } from "./StyledCard";
+import { styled } from "@mui/material";
 
-export default function NewsArticle({image , title , description , author , publishedAt}) {
+
+const Link =styled("a")(({theme})=>({
+    textDecoration:"none",
+    color:theme.palette.text.primary,
+}))
+export default function NewsArticle({
+    image,
+    title,
+    description,
+    author,
+    publishedAt,
+    url,
+}) {
     return (
         <StyledCard>
             <CardActionArea>
-                {image && <CardMedia
-                    component="img"
-                    height="200"
-                    image={image}
-                    alt="Sample article"
-                />}
-                <CardContent>
-                    <Typography gutterBottom variant="h6" component="div">
-                        {title}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                       {description}
-                    </Typography>
-                </CardContent>
+                <Link href={url} target="_blank">
+                    {image && (
+                        <CardMedia
+                            component="img"
+                            height="200"
+                            image={image}
+                            alt="Sample article"
+                        />
+                    )}
+                    <CardContent>
+                        <Typography gutterBottom variant="h6" component="div">
+                            {title}
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary">
+                            {description}
+                        </Typography>
+                    </CardContent>
+                </Link>
             </CardActionArea>
             <Box p={2}>
                 <Typography
@@ -30,11 +47,13 @@ export default function NewsArticle({image , title , description , author , publ
                     color="textSecondary"
                     display="block"
                 >
-                   {author}
+                    {author}
                 </Typography>
-                {publishedAt && <Typography variant="caption" color="textSecondary">
-                   {new Date(publishedAt).toLocaleDateString() }
-                </Typography>}
+                {publishedAt && (
+                    <Typography variant="caption" color="textSecondary">
+                        {new Date(publishedAt).toLocaleDateString()}
+                    </Typography>
+                )}
             </Box>
         </StyledCard>
     );

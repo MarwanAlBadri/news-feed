@@ -1,88 +1,98 @@
 import NewsFeed from "./components/NewsFeed";
 import { Container, Button, styled, Typography } from "@mui/material";
 import NewsHeader from "./components/NewsHeader";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { debounce } from "lodash";
+
 const Footer = styled("div")(({ theme }) => ({
     margin: theme.spacing(2, 0),
     display: "flex",
     justifyContent: "space-between",
 }));
 const PAGE_SIZE = 4;
+
 function App() {
     const [articles, setArticles] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [category , setCategory]= useState("general")
-    const pageNumber = useRef(1);
-    const queryValue = useRef("");
+    const [category, setCategory] = useState("general");
+    const [query, setQuery] = useState("");
+    const [page, setPage] = useState(1);
 
-    async function loadData() {
-        const url = queryValue
-            ? `https://newsapi.org/v2/everything?q=${queryValue}&pageSize=${PAGE_SIZE}&page=${pageNumber}&apiKey=${import.meta.env.VITE_NEWS_API_KEY}`
-            : `https://newsapi.org/v2/top-headlines?q=${queryValue}&category=${category}&country=us&pageSize=${PAGE_SIZE}&page=${pageNumber}&apiKey=${import.meta.env.VITE_NEWS_API_KEY}`;
-
-        const response = await fetch(url);
-        const data = await response.json();
-        if (data.status == "error") {
-            throw new Error(data.message);
-        }
-        return data.articles.map((article) => {
-            const { urlToImage, title, description, author, publishedAt } =
-                article;
-            return {
-                title,
-                description,
-                author,
-                publishedAt,
-                image: urlToImage,
-            };
-        });
-    }
-
-    const fetchAndUpdateArticles = () => {
-        setLoading(true);
-        loadData("", pageNumber.current)
-            .then((newData) => {
-                setArticles(newData);
-            })
-            .catch((errorMessage) => {
-                setError(errorMessage.message);
-            })
-            .finally(() => {
-                setLoading(false);
-            });
-    };
-    const debounceLoadData = debounce(fetchAndUpdateArticles, 500);
-
+    // أي تغيير في category / query / page => يعمل fetch لوحده
     useEffect(() => {
-        fetchAndUpdateArticles();
-    }, []);
+        let ignore = false; // يمنع رد قديم يكتب فوق رد أحدث
 
-    const handelSearchChange = (newQuery) => {
-        pageNumber.current = 1;
-        queryValue.current = newQuery;
-        debounceLoadData();
-    };
-    const handelNextClick = () => {
-        pageNumber.current += 1;
-        fetchAndUpdateArticles();
-    };
-    const handelPreviousClick = () => {
-        pageNumber.current -= 1;
-        fetchAndUpdateArticles();
+        async function load() {
+            setLoading(true);
+            setError("");
+            try {
+                const params = new URLSearchParams({
+                    category,
+                    country: "us",
+                    pageSize: PAGE_SIZE,
+                    page,
+                    apiKey: import.meta.env.VITE_NEWS_API_KEY,
+                });
+                if (query) params.set("q", query);
+
+                const response = await fetch(
+                    `https://newsapi.org/v2/top-headlines?${params}`
+                );
+                const data = await response.json();
+                if (data.status === "error") throw new Error(data.message);
+
+                if (!ignore) {
+                    setArticles(
+                        data.articles.map(
+                            ({ urlToImage, title, description, author, publishedAt ,url}) => ({
+                                title,
+                                url,
+                                description,
+                                author,
+                                publishedAt,
+                                image: urlToImage,
+                            })
+                        )
+                    );
+                }
+            } catch (e) {
+                if (!ignore) setError(e.message);
+            } finally {
+                if (!ignore) setLoading(false);
+            }
+        }
+
+        load();
+        return () => {
+            ignore = true;
+        };
+    }, [category, query, page]);
+
+    // debounce يتعمل مرة واحدة بس (مش كل render)
+    const debouncedSearch = useMemo(
+        () =>
+            debounce((value) => {
+                setPage(1);
+                setQuery(value);
+            }, 500),
+        []
+    );
+
+    const handleCategoryChange = (event) => {
+        setPage(1);
+        setCategory(event.target.value);
     };
 
-    const handelCategoryChange=(event)=>{
-        
-        setCategory(event.target.value)
-        pageNumber.current= 1 ;
-    }
     return (
         <Container>
-            <NewsHeader onSearchChange={handelSearchChange} category={category} onCategoryChange={handelCategoryChange} />
+            <NewsHeader
+                onSearchChange={debouncedSearch}
+                category={category}
+                onCategoryChange={handleCategoryChange}
+            />
             {error.length === 0 ? (
-                <NewsFeed articles={articles} loading={loading}  />
+                <NewsFeed articles={articles} loading={loading} />
             ) : (
                 <Typography color="error" align="center">
                     {error}
@@ -92,15 +102,15 @@ function App() {
             <Footer>
                 <Button
                     variant="outlined"
-                    onClick={handelPreviousClick}
-                    disabled={loading|| pageNumber.current === 1}
+                    onClick={() => setPage((p) => p - 1)}
+                    disabled={loading || page === 1}
                 >
                     Previous
                 </Button>
                 <Button
                     variant="outlined"
-                    onClick={handelNextClick}
-                    disabled={loading|| articles.length < PAGE_SIZE - 1}
+                    onClick={() => setPage((p) => p + 1)}
+                    disabled={loading || articles.length < PAGE_SIZE}
                 >
                     Next
                 </Button>
